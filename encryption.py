@@ -10,14 +10,22 @@ Written on Dec/28/2022
 
 # Importing required libraries
 import boto3
-from Crypto.Random import get_random_bytes
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+from botocore.exceptions import ClientError
+from logging import getLogger
+from os import urandom
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+
 import base64
 import json
 
 # Setting the region
-region = "us-east-1"
+region = "us-west-1"
+
+getLogger().setLevel("INFO")
+getLogger("botocore").setLevel("CRITICAL")
+getLogger("boto3").setLevel("CRITICAL")
 
 # Create the KMS client
 kms_client = boto3.client("kms", region_name=region)
@@ -31,18 +39,27 @@ def encrypt_data(plaintext, key_id):
     Method to encrypt the data using envelope encryption
     The method returns encrypted data, encrypted data key, and also respective base64 encoded values.
     """
-    # Generate a data key using AWS CMK
-    data_key = kms_client.generate_data_key(KeyId=key_id, KeySpec="AES_256")
-    plaintext_data_key = data_key["Plaintext"]
-    encrypted_data_key = data_key["CiphertextBlob"]
-
     # Generate a random IV
-    iv = get_random_bytes(16)
+    iv = urandom(16)
+
+    try:
+        # Generate a data key using AWS CMK
+        data_key = kms_client.generate_data_key(KeyId=key_id, KeySpec="AES_256")
+    except ClientError as e:
+        getLogger().error(e)
+        exit()
 
     # Encrypt the data with AES CBC mode
-    cipher = AES.new(plaintext_data_key, AES.MODE_CBC, iv)
-    padded_data = pad(plaintext, 16)
-    ciphertext_blob = cipher.encrypt(padded_data)
+    plaintext_data_key = data_key["Plaintext"]
+    encrypted_data_key = data_key["CiphertextBlob"]
+    cipher = Cipher(algorithms.AES(plaintext_data_key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(plaintext)
+    padded_data += padder.finalize()
+
+    ciphertext_blob = encryptor.update(padded_data) + encryptor.finalize()
 
     # Encode the encrypted data and data key  with base64
     encoded_ciphertext_blob = base64.b64encode(ciphertext_blob)
@@ -72,9 +89,13 @@ def decrypt_data(encoded_ciphertext_blob, encoded_encrypted_data_key, iv):
     plaintext_data_key = data_key["Plaintext"]
 
     # Decrypt the data
-    cipher = AES.new(plaintext_data_key, AES.MODE_CBC, iv)
-    decrypted_padded_data = cipher.decrypt(decoded_ciphertext_blob)
-    plaintext = unpad(decrypted_padded_data, 16)
+    cipher = Cipher(algorithms.AES(plaintext_data_key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+    decrypted_padded_data = decryptor.update(decoded_ciphertext_blob) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(128).unpadder()
+    plaintext = unpadder.update(decrypted_padded_data)
+    plaintext += unpadder.finalize()
 
     # Return the decrypted data
     return plaintext
@@ -100,6 +121,7 @@ def main():
         iv,
     ) = encrypt_data(input_plaintext, KEY_ID)
 
+    print(encoded_ciphertext_blob)
     # Decrypt the data
     plaintext = decrypt_data(encoded_ciphertext_blob, encoded_encrypted_data_key, iv)
     print(json.loads(str(plaintext, "utf-8")))

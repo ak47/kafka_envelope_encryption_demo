@@ -24,7 +24,7 @@ To reproduce this demo:
 
 2. Add an AWS CMK Key ARN to `encryption.py` `KEY_ID`
 
-- Hinge Health Engineers, this can be generated via [Hinge_Engineer_Dev](https://hingehealthsso.awsapps.com/start/#/?tab=accounts) role under the `Key Management Service` interface.
+- Hinge Health Engineers, this can be generated via [HingePowerUser](https://hingehealthsso.awsapps.com/start/#/?tab=accounts) role under the `Key Management Service` interface.
 - Note: this code is set for `us-east-1` zone.
 
 3. Follow the steps in the resource `Kafka Producer/Consumer Python Tutorial`

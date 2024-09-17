@@ -40,7 +40,6 @@ if __name__ == '__main__':
     example_keys = ['eabara', 'jsmith', 'sgarcia', 'jbernard', 'htanaka', 'awalther']
     exmample_dicts = [{'book': 'book'}, {'alarm clock': 'alarm clock'}, {'t-shirts': 't-shirts'}, {'gift card': 'gift card'}, {'batteries': 'batteries'}]
 
-    count = 0
     for _ in range(10):
         key = choice(example_keys)
         data_message = json.dumps(choice(exmample_dicts)).encode("utf-8")
@@ -70,7 +69,6 @@ if __name__ == '__main__':
         print(f"HEADERS: {headers=}")
 
         producer.produce(topic, payload, key, callback=delivery_callback, headers=headers)
-        count += 1
 
     # Block until the messages are sent.
     producer.poll(10000)
