@@ -78,6 +78,7 @@ def encrypt_data(plaintext, key_id):
     # Encode the encrypted data and data key  with base64
     encoded_ciphertext_blob = base64.b64encode(ciphertext_blob)
     encoded_encrypted_data_key = base64.b64encode(encrypted_data_key)
+    encoded_gcm_tag = base64.b64encode(encryptor.tag)
 
     # Return the encrypted data and the encrypted data key
     return (
@@ -86,7 +87,7 @@ def encrypt_data(plaintext, key_id):
         encrypted_data_key,
         encoded_encrypted_data_key,
         iv,
-        encryptor.tag,
+        encoded_gcm_tag,
     )
 
 
@@ -98,6 +99,7 @@ def decrypt_data(encoded_ciphertext_blob: bytes, encoded_encrypted_data_key: byt
     # Base64 decode of encrypted data and encrypted data key
     decoded_ciphertext_blob: bytes = base64.b64decode(encoded_ciphertext_blob)
     decoded_encrypted_data_key: bytes = base64.b64decode(encoded_encrypted_data_key)
+    decoded_gcmtag: bytes = base64.b64decode(gcm_tag)
 
     # Decrypt the data key
     data_key: dict = kms_client.decrypt(CiphertextBlob=decoded_encrypted_data_key)
@@ -106,7 +108,7 @@ def decrypt_data(encoded_ciphertext_blob: bytes, encoded_encrypted_data_key: byt
     # Decrypt the data
     cipher = Cipher(algorithms.AES(plaintext_data_key), modes.GCM(iv))
     decryptor = cipher.decryptor()
-    decrypted_padded_data: bytes = decryptor.update(decoded_ciphertext_blob) + decryptor.finalize_with_tag(gcm_tag)
+    decrypted_padded_data: bytes = decryptor.update(decoded_ciphertext_blob) + decryptor.finalize_with_tag(decoded_gcmtag)
 
     unpadder = padding.PKCS7(128).unpadder()
     plaintext: bytes = unpadder.update(decrypted_padded_data)
